@@ -33,8 +33,10 @@ entity_query_response = (req, res, next) ->
   res.header('Content-Type','application/xml')
   res.contentType = 'application/xml'  
 
+  req.query.maxtoreturn ?= 50
+
   query_control = 
-    max_to_return : 10
+    max_to_return : req.query.maxtoreturn
     match_value : req.query.matchvalue
 
   query_result = entityquery.query(

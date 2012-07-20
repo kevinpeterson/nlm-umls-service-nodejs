@@ -1,5 +1,5 @@
 server_context =
-	server_root = "http://some/server"
+  server_root : "http://some/server"
 
 database =
   username: "lexgrid"
