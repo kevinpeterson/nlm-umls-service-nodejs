@@ -1,6 +1,7 @@
-server_root = "http://some/server"
+server_context =
+	server_root = "http://some/server"
 
-conf =
+database =
   username: "lexgrid"
   password: "lexgrid"
   database: "umls"
@@ -9,5 +10,10 @@ conf =
   pool_max: 10
   pool_min: 2
 
-module.exports.server_root = server_root
-module.exports.conf = conf
+index = 
+  host: "bmidev4"
+  port: 9200
+
+module.exports.server_context = server_context
+module.exports.database = database
+module.exports.index = index

@@ -1,6 +1,8 @@
 restify = require 'restify'
 entity_xml = require('./xml/entityxml')
 dbpool = require './db/dbpool'
+entityread = require './entity/entityread'
+entityquery = require './entity/entityquery'
 
 server = restify.createServer(
   formatters: 
@@ -8,65 +10,42 @@ server = restify.createServer(
       return body
 )
 
+server.use(restify.queryParser())
+
+entity_read_by_name_response = (req, res, next) ->      
+  res.header('Content-Type','application/xml')
+
+  entity_name = req.params.entity_name      
+  code_system = req.params.code_system
+
+  dbpool.pool.acquire( 
+    (pool_err, connection) ->
+      entityread.read_by_name(
+        connection, 
+        code_system, 
+        entity_name,
+        (entity) ->
+          res.contentType = 'application/xml'            
+          res.send(entity_xml.build_entity(entity))
+          dbpool.pool.release(connection)))
+
+entity_query_response = (req, res, next) ->      
+  res.header('Content-Type','application/xml')
+  res.contentType = 'application/xml'  
+
+  query_control = 
+    max_to_return : 10
+    match_value : req.query.matchvalue
+
+  query_result = entityquery.query(
+    query_control,
+    (entity_directory) ->
+      res.send(entity_xml.build_entity_directory(entity_directory))
+  )
+
 start_server = () ->
-  respond = (req, res, next) ->      
-    res.header('Content-Type','application/xml')
-
-    entity_name = req.params.entity_name      
-    code_system = req.params.code_system
-
-    dbpool.pool.acquire( (pool_err, connection) ->
-      connection.query(       
-        """
-        SELECT mc.CODE, mc.SAB, mc.STR, md.DEF    
-          FROM MRCONSO mc
-        LEFT JOIN MRRANK mr
-          ON (mc.SAB = mr.SAB and mc.TTY = mr.TTY)  
-        LEFT JOIN MRDEF md
-          on mc.CUI = md.CUI and mc.AUI = md.AUI and mc.SAB = md.SAB
-        WHERE mc.SAB = ? AND mc.CODE = ?    
-        ORDER BY RANK DESC;
-
-        """, [code_system, entity_name], 
-          (err, statement_results) ->    
-
-            if statement_results.length is 0
-              res.contentType = 'application/xml'            
-              res.send(entity_xml.build_unknown_entity(entity_name))  
-            else
-              if(err)            
-                res.contentType = 'text';            
-                res.send(err);          
-              else    
-                mrconso_results = statement_results
-                entity = new Object();            
-                entity.name = mrconso_results[0].CODE;            
-                entity.code_system = mrconso_results[0].SAB;            
-                entity.descriptions = new Array();
-
-                for result in mrconso_results                         
-                  description = new Object()            
-                  description.value = result.STR;		              
-                  description.is_preferred = false
-                  entity.descriptions.push(description)
-
-                  definition_value = result.DEF
-                  if definition_value
-                    definition = new Object()      
-                    definition.value = definition_value
-
-                    entity.definitions ?= []
-                    entity.definitions.push(definition)
-
-                entity.descriptions[0].is_preferred = true
-
-                res.contentType = 'application/xml'            
-                res.send(entity_xml.build_entity(entity))
-                dbpool.pool.release(connection)))
-                
-    
-
-  server.get('/codesystem/:code_system/entity/:entity_name', respond )
+  server.get('/codesystem/:code_system/entity/:entity_name', entity_read_by_name_response )
+  server.get('/entities', entity_query_response )
 		    
   server.listen(8080, () -> 
     console.log('%s listening at %s', server.name, server.url) )
